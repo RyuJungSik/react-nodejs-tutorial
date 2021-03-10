@@ -1,5 +1,6 @@
 const mongoose=require('mongoose');
 const bcrypt=require('bcrypt');
+const { JsonWebTokenError } = require('jsonwebtoken');
 const saltRounds=10
 
 const userSchema=mongoose.Schema({
@@ -54,22 +55,26 @@ userSchema.pre('save', function(next){
     }
 })
 
-
-app.post('/login', (req, res) => {
-    //요청된 이메일을 데이터베이스에서 있는지 찾는다.
-    User.findOne({email : req.body.email}, (err, user) => {
-        if(!user){
-            return res.json({
-                loginSuccess:false,
-                message: "제공된 이메일에 해당하는 유저가 없습니다."
-            })
-        }
+userSchema.methods.comparePassword=function(plainPassword, cb){
+    //plainPassword 123123 암호화된 
+    bcrypt.compare(plainPassword, this.password, function(err, isMatch){
+        if(err) return cb(err),
+        cb(null, isMatch)
     })
+}
 
-    //요청된 이메일이 데이터 베이스에 있다면 비밀번호가 맞는 비밀번호 인지 확인.
+userSchema.methods.generateToken=function(cb){
+    //jsonwebtoken이용해서 토큰 생성하기
+    var user=this;
+    var token=jwt.sign(user._id.toHexString(), 'secretToken')
+    // user.id+'secretToken'=token
 
-    //비밀번호 까지 맞다면 토큰을 생성하기
-})
+    user.token=token
+    user.save(function(err, user){
+        if(err) return cb(err)
+        cb(null, user)
+    })
+}
 
 
 const User=mongoose.model('User', userSchema)
